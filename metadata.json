@@ -1,0 +1,7 @@
+{
+  "name": "livetalker",
+  "description": "An interactive sandbox",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
