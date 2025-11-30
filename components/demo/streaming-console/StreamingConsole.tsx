@@ -75,7 +75,7 @@ export default function StreamingConsole() {
   const turns = useLogStore(state => state.turns);
   const scrollRef = useRef<HTMLDivElement>(null);
   
-  // State for live captions from the input audio (e.g. YouTube)
+  // State for live captions from the input audio (What the AI hears/reads from YouTube)
   const [captions, setCaptions] = useState('');
 
   useEffect(() => {
@@ -121,16 +121,18 @@ export default function StreamingConsole() {
   useEffect(() => {
     const { addTurn, updateLastTurn } = useLogStore.getState();
 
-    // Listener for live captions from input audio
+    // Listener for live captions from input audio (Source Transcription)
+    // This feeds the "Real-time Captions" overlay on the Media Embedder
     const handleInputTranscription = (text: string, isFinal: boolean) => {
        setCaptions(text);
        if (isFinal) {
-         setTimeout(() => setCaptions(''), 3000); // clear after 3s
+         // Clear caption after a short delay if it's a final sentence
+         setTimeout(() => setCaptions(prev => prev === text ? '' : prev), 3000); 
        }
     };
 
     const handleOutputTranscription = (text: string, isFinal: boolean) => {
-        // Log model output for display in the console
+        // Log model output (Interpretation) for display in the console
         if (isFinal) {
             addTurn({
                 role: 'model',
@@ -168,7 +170,7 @@ export default function StreamingConsole() {
     }
   });
 
-  // Filter: Show "model" turns (The AI's Interpretation)
+  // Filter: Show "model" turns (The AI's Interpretation/Translation)
   const scriptTurns = turns.filter(t => t.role === 'model' && t.text);
 
   return (

@@ -18,7 +18,7 @@ export default function MediaEmbedder({ captions }: MediaEmbedderProps) {
   const [embedSrc, setEmbedSrc] = useState('');
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  // Fetch Metadata using oEmbed when URL changes
+  // Fetch Metadata using oEmbed (YouTube Data API) when URL changes
   useEffect(() => {
     if (!mediaUrl) {
         setEmbedSrc('');
@@ -43,8 +43,11 @@ export default function MediaEmbedder({ captions }: MediaEmbedderProps) {
     if (videoId) {
         // enablejsapi=1 is critical for volume control (postMessage)
         const origin = window.location.origin;
+        // cc_load_policy=1 forces standard captions if available
         finalSrc = `https://www.youtube.com/embed/${videoId}?autoplay=1&cc_load_policy=1&hl=${language || 'en'}&enablejsapi=1&origin=${origin}&playsinline=1&rel=0`;
 
+        // Use YouTube oEmbed API to fetch video context (Title, Author)
+        // This informs the AI System Prompt about the content it is interpreting.
         const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`;
         fetch(oembedUrl)
             .then(res => res.json())
@@ -64,10 +67,11 @@ export default function MediaEmbedder({ captions }: MediaEmbedderProps) {
     setEmbedSrc(finalSrc);
   }, [mediaUrl, language, setMediaTitle]);
 
-  // Handle Source Volume Ducking via PostMessage
+  // Handle Source Volume Ducking via PostMessage (YouTube IFrame API)
   useEffect(() => {
     if (iframeRef.current && iframeRef.current.contentWindow && mediaUrl.includes('youtube')) {
-        // Send command to YouTube Player
+        // Send command to YouTube Player to adjust volume
+        // This allows separating the Source Audio from the Interpreter's Voice
         iframeRef.current.contentWindow.postMessage(JSON.stringify({
             event: 'command',
             func: 'setVolume',
@@ -107,7 +111,7 @@ export default function MediaEmbedder({ captions }: MediaEmbedderProps) {
             </div>
         )}
         
-        {/* Live Caption Overlay - Renders AI Transcription over the video */}
+        {/* Live Caption Overlay - Renders AI Transcription (Input) over the video */}
         {captions && (
             <div className="live-caption-overlay">
                 <span className="caption-text">{captions}</span>
