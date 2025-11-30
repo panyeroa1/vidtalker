@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -7,7 +8,11 @@ import { useSettings } from '@/lib/state';
 import { useLiveAPIContext } from '@/contexts/LiveAPIContext';
 import c from 'classnames';
 
-export default function MediaEmbedder() {
+export type MediaEmbedderProps = {
+  captions?: string;
+};
+
+export default function MediaEmbedder({ captions }: MediaEmbedderProps) {
   const { mediaUrl, language, setMediaTitle, sourceVolume } = useSettings();
   const { connected, connectWithScreenAudio } = useLiveAPIContext();
   const [embedSrc, setEmbedSrc] = useState('');
@@ -49,7 +54,8 @@ export default function MediaEmbedder() {
                 }
             })
             .catch(err => {
-                setMediaTitle('Unknown Video Context');
+                console.debug('OEmbed fetch failed, using generic context');
+                setMediaTitle('Web Video Content');
             });
     } else {
         setMediaTitle('Web Content');
@@ -98,6 +104,13 @@ export default function MediaEmbedder() {
                     <span className="material-symbols-outlined">graphic_eq</span>
                     Start Interpretation (Capture Audio & Vision)
                 </button>
+            </div>
+        )}
+        
+        {/* Live Caption Overlay - Renders AI Transcription over the video */}
+        {captions && (
+            <div className="live-caption-overlay">
+                <span className="caption-text">{captions}</span>
             </div>
         )}
       </div>

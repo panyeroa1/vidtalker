@@ -175,12 +175,7 @@ export default function StreamingConsole() {
     <div className="streaming-console-layout">
       {/* Media Embedding Section with Live Caption Overlay */}
       <div className="media-container-wrapper">
-         <MediaEmbedder />
-         {captions && (
-            <div className="live-caption-overlay">
-                <span className="caption-text">{captions}</span>
-            </div>
-         )}
+         <MediaEmbedder captions={captions} />
       </div>
 
       <div className="digital-clock-wrapper">
