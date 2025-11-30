@@ -177,7 +177,7 @@ export default function StreamingConsole() {
   return (
     <div className="streaming-console-layout">
       {/* Media Embedding Section */}
-      <div className="media-container" style={{width: '100%', maxWidth: '800px', position: 'relative'}}>
+      <div className="media-container-wrapper">
          <MediaEmbedder />
          {captions && (
             <div className="live-caption-overlay">

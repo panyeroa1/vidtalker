@@ -38,9 +38,11 @@ export default function MediaEmbedder() {
         {embedSrc ? (
             <iframe 
                 src={embedSrc} 
+                className="media-iframe"
                 title="Embedded Content"
                 frameBorder="0" 
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+                sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-presentation"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; microphone" 
                 referrerPolicy="strict-origin-when-cross-origin" 
                 allowFullScreen
             ></iframe>
