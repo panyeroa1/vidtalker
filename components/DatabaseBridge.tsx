@@ -20,6 +20,9 @@ const workerScript = `
 const segmentText = (text: string): string[] => {
   if (!text) return [];
 
+  // Normalize whitespace to single spaces to avoid odd gaps or breaks
+  const normalizedText = text.replace(/\s+/g, ' ').trim();
+
   let sentences: string[] = [];
 
   // Robust segmentation using Intl.Segmenter (handles abbreviations like Mr., Dr. correctly)
@@ -29,14 +32,14 @@ const segmentText = (text: string): string[] => {
       // @ts-ignore - Intl.Segmenter might not be in all TS definitions yet
       const segmenter = new (Intl as any).Segmenter('en', { granularity: 'sentence' });
       // @ts-ignore
-      sentences = Array.from(segmenter.segment(text)).map((s: any) => s.segment);
+      sentences = Array.from(segmenter.segment(normalizedText)).map((s: any) => s.segment);
     } catch (e) {
       // Fallback if instantiation fails
-      sentences = text.match(/[^.!?]+[.!?]+["']?|[^.!?]+$/g) || [text];
+      sentences = normalizedText.match(/[^.!?]+[.!?]+["']?|[^.!?]+$/g) || [normalizedText];
     }
   } else {
      // Fallback Regex
-     sentences = text.match(/[^.!?]+[.!?]+["']?|[^.!?]+$/g) || [text];
+     sentences = normalizedText.match(/[^.!?]+[.!?]+["']?|[^.!?]+$/g) || [normalizedText];
   }
   
   const chunks: string[] = [];
@@ -47,18 +50,28 @@ const segmentText = (text: string): string[] => {
     const cleanSentence = sentence.trim();
     if (!cleanSentence) continue;
     
-    // Add space if appending to existing chunk
-    if (currentChunk) currentChunk += ' ';
-    currentChunk += cleanSentence;
-    sentenceCount++;
+    // Determine if we should start a new chunk BEFORE adding this sentence
+    const currentLength = currentChunk.length;
+    const nextLength = cleanSentence.length;
     
-    // Chunking heuristics for natural pauses:
-    // 1. Group 2-3 sentences together to form a complete thought.
-    // 2. If the current chunk exceeds 250 chars, wrap it up to avoid running out of breath.
-    if ((sentenceCount >= 2 && currentChunk.length > 150) || sentenceCount >= 3 || currentChunk.length > 250) {
+    // Heuristics for Natural TTS Pacing:
+    // 1. Hard Limit: If adding the next sentence exceeds ~300 chars, push current chunk immediately.
+    // 2. Count & Length: If we have >= 2 sentences AND > 100 chars, it's a good chunk.
+    // 3. Just Count: If we hit 3 sentences, usually time to breathe.
+    
+    const willExceedHardLimit = (currentLength + nextLength) > 300;
+    const isGoodSizeChunk = (sentenceCount >= 2 && currentLength > 100);
+    const isMaxSentences = sentenceCount >= 3;
+
+    if (currentLength > 0 && (willExceedHardLimit || isGoodSizeChunk || isMaxSentences)) {
       chunks.push(currentChunk.trim());
-      currentChunk = '';
-      sentenceCount = 0;
+      currentChunk = cleanSentence;
+      sentenceCount = 1;
+    } else {
+      // Append to current chunk
+      if (currentChunk) currentChunk += ' ';
+      currentChunk += cleanSentence;
+      sentenceCount++;
     }
   }
   

@@ -25,7 +25,6 @@ import StreamingConsole from './components/demo/streaming-console/StreamingConso
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import { LiveAPIProvider } from './contexts/LiveAPIContext';
-import DatabaseBridge from './components/DatabaseBridge';
 import { useUI } from './lib/state';
 
 const API_KEY = process.env.GEMINI_API_KEY as string;
@@ -45,7 +44,6 @@ function App() {
   return (
     <div className="App" data-theme={theme}>
       <LiveAPIProvider apiKey={API_KEY}>
-        <DatabaseBridge />
         <ErrorScreen />
         <Header />
         <Sidebar />

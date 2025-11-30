@@ -23,7 +23,7 @@ const ScriptReader = memo(({ text }: { text: string }) => {
     if (text === displayedText) return;
     
     // Calculate typing speed - faster for long text to keep up, but minimum readable speed
-    const typingSpeed = 20; 
+    const typingSpeed = 30; 
 
     const interval = setInterval(() => {
       setDisplayedText((prev) => {
@@ -39,20 +39,9 @@ const ScriptReader = memo(({ text }: { text: string }) => {
     return () => clearInterval(interval);
   }, [text]);
 
-  // Simple parser to separate stage directions from spoken text
-  // Directions are in parentheses () or brackets []
-  const parts = displayedText.split(/([(\[].*?[)\]])/g);
-
   return (
     <div className="script-line">
-      {parts.map((part, index) => {
-        if (part.match(/^[(\[].*[)\]]$/)) {
-          // It's a stage direction
-          return <span key={index} className="script-direction">{part}</span>;
-        }
-        // It's spoken text
-        return <span key={index} className="script-spoken">{part}</span>;
-      })}
+      <span className="script-spoken">{displayedText}</span>
     </div>
   );
 });
@@ -140,15 +129,22 @@ export default function StreamingConsole() {
     };
 
     const handleOutputTranscription = (text: string, isFinal: boolean) => {
-       // Suppressed for Script View
+        // Log model output for display in the console
+        if (isFinal) {
+            addTurn({
+                role: 'model',
+                text: text,
+                isFinal: true
+            });
+        }
     };
 
     const handleContent = (serverContent: LiveServerContent) => {
-       // Suppressed for Script View
+       // We can handle raw content updates here if needed
     };
 
     const handleTurnComplete = () => {
-       // Suppressed
+       // Turn complete
     };
 
     client.on('inputTranscription', handleInputTranscription);
@@ -171,8 +167,8 @@ export default function StreamingConsole() {
     }
   });
 
-  // Filter: Only show "system" turns which contain our Script
-  const scriptTurns = turns.filter(t => t.role === 'system');
+  // Filter: Show "model" turns (The AI's Interpretation)
+  const scriptTurns = turns.filter(t => t.role === 'model' && t.text);
 
   return (
     <div className="streaming-console-layout">
@@ -194,8 +190,8 @@ export default function StreamingConsole() {
         {scriptTurns.length === 0 ? (
           <div className="console-box empty">
             <div className="waiting-placeholder">
-              <span className="material-symbols-outlined icon">auto_stories</span>
-              <p>Waiting for stream...</p>
+              <span className="material-symbols-outlined icon">record_voice_over</span>
+              <p>Ready to interpret...</p>
             </div>
           </div>
         ) : (
