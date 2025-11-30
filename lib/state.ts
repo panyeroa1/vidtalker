@@ -14,10 +14,11 @@ export type Template = 'eburon-tts';
 export type Theme = 'light' | 'dark';
 export type VoiceStyle = 'natural' | 'breathy' | 'dramatic';
 
-const generateSystemPrompt = (language: string) => `
+const generateSystemPrompt = (language: string, mediaTitle: string = '') => `
 ROLE: Simultaneous Audio Interpreter & Scene Narrator
 TARGET LANGUAGE: [${language || 'English'}]
 INPUT SOURCE: Live Audio Stream (Video/Movie/Speech)
+CONTEXT: ${mediaTitle ? `You are interpreting a video/content titled: "${mediaTitle}"` : 'General Media Stream'}
 
 OBJECTIVE:
 1. **LISTEN** to the incoming audio stream continuously.
@@ -45,6 +46,7 @@ export const useSettings = create<{
   voiceStyle: VoiceStyle;
   language: string;
   mediaUrl: string;
+  mediaTitle: string;
   backgroundPadEnabled: boolean;
   backgroundPadVolume: number;
   setSystemPrompt: (prompt: string) => void;
@@ -53,11 +55,13 @@ export const useSettings = create<{
   setVoiceStyle: (style: VoiceStyle) => void;
   setLanguage: (language: string) => void;
   setMediaUrl: (url: string) => void;
+  setMediaTitle: (title: string) => void;
   setBackgroundPadEnabled: (enabled: boolean) => void;
   setBackgroundPadVolume: (volume: number) => void;
 }>(set => ({
   language: '',
-  systemPrompt: generateSystemPrompt(''),
+  mediaTitle: '',
+  systemPrompt: generateSystemPrompt('', ''),
   model: DEFAULT_LIVE_API_MODEL,
   voice: DEFAULT_VOICE,
   voiceStyle: 'breathy',
@@ -68,8 +72,15 @@ export const useSettings = create<{
   setModel: model => set({ model }),
   setVoice: voice => set({ voice }),
   setVoiceStyle: voiceStyle => set({ voiceStyle }),
-  setLanguage: language => set({ language, systemPrompt: generateSystemPrompt(language) }),
+  setLanguage: language => set(state => ({ 
+    language, 
+    systemPrompt: generateSystemPrompt(language, state.mediaTitle) 
+  })),
   setMediaUrl: url => set({ mediaUrl: url }),
+  setMediaTitle: title => set(state => ({ 
+    mediaTitle: title, 
+    systemPrompt: generateSystemPrompt(state.language, title) 
+  })),
   setBackgroundPadEnabled: enabled => set({ backgroundPadEnabled: enabled }),
   setBackgroundPadVolume: volume => set({ backgroundPadVolume: volume }),
 }));

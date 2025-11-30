@@ -85,10 +85,23 @@ export class AudioRecorder {
 
     this.starting = new Promise(async (resolve, reject) => {
       try {
-        // Request screen share with audio
+        // Request screen share with specific audio constraints
+        // systemAudio: 'include' helps browser hint to user to share audio
+        // selfBrowserSurface: 'include' allows capturing current tab easily
         this.stream = await navigator.mediaDevices.getDisplayMedia({ 
           video: true, 
-          audio: true 
+          audio: {
+            // @ts-ignore - non-standard constraints that help in Chrome
+            autoGainControl: false,
+            echoCancellation: false,
+            noiseSuppression: false,
+            channelCount: 1, // Mono for API compatibility
+            sampleRate: 16000
+          },
+          // @ts-ignore
+          systemAudio: 'include',
+          surfaceSwitching: 'include',
+          monitorTypeSurfaces: 'include'
         });
       } catch (e) {
         console.warn('Screen capture denied.', e);
@@ -98,7 +111,7 @@ export class AudioRecorder {
       
       // If the user didn't share audio, this track might be missing
       if (this.stream.getAudioTracks().length === 0) {
-        console.warn('No audio track in screen share.');
+        console.warn('No audio track in screen share. Please select "Share Audio" in the dialog.');
       }
 
       await this.initializeAudioGraph();
