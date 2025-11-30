@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -23,6 +24,7 @@ export default function MediaEmbedder() {
     let videoId = '';
     let finalSrc = mediaUrl;
 
+    // Robust ID extraction
     try {
         if (mediaUrl.includes('youtube.com/watch')) {
             const urlObj = new URL(mediaUrl);
@@ -35,12 +37,16 @@ export default function MediaEmbedder() {
     } catch(e) { console.warn(e); }
 
     if (videoId) {
-        // Construct Embed URL with Caption Preferences
-        // cc_load_policy=1 : Force captions
-        // hl={language} : Interface language (often helps with caption selection)
-        finalSrc = `https://www.youtube.com/embed/${videoId}?cc_load_policy=1&hl=${language || 'en'}`;
+        // Construct Embed URL with optimizied params
+        // cc_load_policy=1 : Force captions (visual backup)
+        // hl={language} : Interface language
+        // enablejsapi=1 : Allow control via JS (future proofing)
+        // origin : Required for JS API
+        const origin = window.location.origin;
+        finalSrc = `https://www.youtube.com/embed/${videoId}?autoplay=1&cc_load_policy=1&hl=${language || 'en'}&enablejsapi=1&origin=${origin}&playsinline=1&rel=0`;
 
-        // Fetch Title via oEmbed (No API Key needed)
+        // Fetch Title via oEmbed (No Auth required for public metadata)
+        // This injects the "Scene Context" into the System Prompt
         const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`;
         fetch(oembedUrl)
             .then(res => res.json())
@@ -51,7 +57,7 @@ export default function MediaEmbedder() {
             })
             .catch(err => {
                 console.warn('Failed to fetch video metadata', err);
-                setMediaTitle('Unknown Video');
+                setMediaTitle('Unknown Video Context');
             });
     } else {
         setMediaTitle('Web Content');
@@ -77,15 +83,15 @@ export default function MediaEmbedder() {
         ) : (
             <div className="empty-embed">
                 <span className="material-symbols-outlined icon">smart_display</span>
-                <p>No Media URL Selected</p>
+                <p>Enter a YouTube URL in Settings</p>
             </div>
         )}
         
-        {!connected && (
+        {!connected && embedSrc && (
             <div className="embed-overlay">
                 <button className="capture-btn" onClick={connectWithScreenAudio}>
                     <span className="material-symbols-outlined">graphic_eq</span>
-                    Capture System Audio
+                    Start Interpretation (Capture Audio)
                 </button>
             </div>
         )}

@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -172,12 +173,12 @@ export default function StreamingConsole() {
 
   return (
     <div className="streaming-console-layout">
-      {/* Media Embedding Section */}
+      {/* Media Embedding Section with Live Caption Overlay */}
       <div className="media-container-wrapper">
          <MediaEmbedder />
          {captions && (
             <div className="live-caption-overlay">
-                {captions}
+                <span className="caption-text">{captions}</span>
             </div>
          )}
       </div>
