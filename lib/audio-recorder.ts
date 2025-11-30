@@ -50,6 +50,11 @@ export class AudioRecorder {
   recording: boolean = false;
   recordingWorklet: AudioWorkletNode | undefined;
   vuWorklet: AudioWorkletNode | undefined;
+  
+  // Vision Support
+  videoTrack: MediaStreamTrack | undefined;
+  captureCanvas: OffscreenCanvas | HTMLCanvasElement | undefined;
+  captureCtx: OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D | null | undefined;
 
   private starting: Promise<void> | null = null;
 
@@ -76,7 +81,7 @@ export class AudioRecorder {
     });
   }
   
-  // New method for capturing system/tab audio
+  // New method for capturing system/tab audio AND video
   async startScreenCapture() {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
       console.warn('Screen capture not supported.');
@@ -85,17 +90,17 @@ export class AudioRecorder {
 
     this.starting = new Promise(async (resolve, reject) => {
       try {
-        // Request screen share with specific audio constraints
-        // systemAudio: 'include' helps browser hint to user to share audio
-        // selfBrowserSurface: 'include' allows capturing current tab easily
         this.stream = await navigator.mediaDevices.getDisplayMedia({ 
-          video: true, 
+          video: {
+              // Low FPS is enough for reading subtitles and saving bandwidth
+              frameRate: { ideal: 5, max: 10 } 
+          }, 
           audio: {
-            // @ts-ignore - non-standard constraints that help in Chrome
+            // @ts-ignore
             autoGainControl: false,
             echoCancellation: false,
             noiseSuppression: false,
-            channelCount: 1, // Mono for API compatibility
+            channelCount: 1, 
             sampleRate: 16000
           },
           // @ts-ignore
@@ -109,9 +114,24 @@ export class AudioRecorder {
         return;
       }
       
-      // If the user didn't share audio, this track might be missing
       if (this.stream.getAudioTracks().length === 0) {
         console.warn('No audio track in screen share. Please select "Share Audio" in the dialog.');
+      }
+      
+      // Setup Video Capture for Vision
+      const vidTracks = this.stream.getVideoTracks();
+      if (vidTracks.length > 0) {
+          this.videoTrack = vidTracks[0];
+          // Initialize canvas
+          if (typeof OffscreenCanvas !== 'undefined') {
+              this.captureCanvas = new OffscreenCanvas(640, 360);
+              this.captureCtx = this.captureCanvas.getContext('2d') as OffscreenCanvasRenderingContext2D;
+          } else {
+              this.captureCanvas = document.createElement('canvas');
+              this.captureCanvas.width = 640;
+              this.captureCanvas.height = 360;
+              this.captureCtx = (this.captureCanvas as HTMLCanvasElement).getContext('2d');
+          }
       }
 
       await this.initializeAudioGraph();
@@ -119,56 +139,98 @@ export class AudioRecorder {
       this.starting = null;
     });
   }
+  
+  async captureFrame(): Promise<string | null> {
+      if (!this.videoTrack || !this.captureCtx || !this.captureCanvas) return null;
+      
+      // We need a way to grab the frame. ImageCapture is one way, but drawing a video element is standard.
+      // Since we don't have a video element playing the stream in DOM, we create a temp one.
+      // Actually, standard practice for efficient stream capture:
+      // We need to use ImageCapture API if available, or pipe track to a video element.
+      
+      try {
+          // @ts-ignore - ImageCapture is experimental but supported in Chrome
+          if (window.ImageCapture) {
+              // @ts-ignore
+              const capturer = new ImageCapture(this.videoTrack);
+              const bitmap = await capturer.grabFrame();
+              this.captureCtx.drawImage(bitmap, 0, 0, this.captureCanvas.width, this.captureCanvas.height);
+              
+              // Convert to base64 jpeg
+              if (this.captureCanvas instanceof OffscreenCanvas) {
+                  const blob = await this.captureCanvas.convertToBlob({ type: 'image/jpeg', quality: 0.6 });
+                  return this.blobToBase64(blob);
+              } else {
+                  return (this.captureCanvas as HTMLCanvasElement).toDataURL('image/jpeg', 0.6).split(',')[1];
+              }
+          }
+      } catch (e) {
+          console.debug('Frame capture failed', e);
+      }
+      return null;
+  }
+
+  private blobToBase64(blob: Blob): Promise<string> {
+      return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+              const base64 = (reader.result as string).split(',')[1];
+              resolve(base64);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+      });
+  }
 
   private async initializeAudioGraph() {
     if (!this.stream) return;
 
     this.audioContext = await audioContext({ sampleRate: this.sampleRate });
-    this.source = this.audioContext.createMediaStreamSource(this.stream);
+    // Check if audio track exists before creating source
+    if (this.stream.getAudioTracks().length > 0) {
+        this.source = this.audioContext.createMediaStreamSource(this.stream);
 
-    const workletName = 'audio-recorder-worklet';
-    const src = createWorketFromSrc(workletName, AudioRecordingWorklet);
+        const workletName = 'audio-recorder-worklet';
+        const src = createWorketFromSrc(workletName, AudioRecordingWorklet);
 
-    await this.audioContext.audioWorklet.addModule(src);
-    this.recordingWorklet = new AudioWorkletNode(
-      this.audioContext,
-      workletName
-    );
+        await this.audioContext.audioWorklet.addModule(src);
+        this.recordingWorklet = new AudioWorkletNode(
+        this.audioContext,
+        workletName
+        );
 
-    this.recordingWorklet.port.onmessage = async (ev: MessageEvent) => {
-      // Worklet processes recording floats and messages converted buffer
-      const arrayBuffer = ev.data.data.int16arrayBuffer;
+        this.recordingWorklet.port.onmessage = async (ev: MessageEvent) => {
+            const arrayBuffer = ev.data.data.int16arrayBuffer;
+            if (arrayBuffer) {
+                const arrayBufferString = arrayBufferToBase64(arrayBuffer);
+                this.emitter.emit('data', arrayBufferString);
+            }
+        };
+        this.source.connect(this.recordingWorklet);
 
-      if (arrayBuffer) {
-        const arrayBufferString = arrayBufferToBase64(arrayBuffer);
-        this.emitter.emit('data', arrayBufferString);
-      }
-    };
-    this.source.connect(this.recordingWorklet);
+        const vuWorkletName = 'vu-meter';
+        await this.audioContext.audioWorklet.addModule(
+        createWorketFromSrc(vuWorkletName, VolMeterWorket)
+        );
+        this.vuWorklet = new AudioWorkletNode(this.audioContext, vuWorkletName);
+        this.vuWorklet.port.onmessage = (ev: MessageEvent) => {
+        this.emitter.emit('volume', ev.data.volume);
+        };
 
-    // vu meter worklet
-    const vuWorkletName = 'vu-meter';
-    await this.audioContext.audioWorklet.addModule(
-      createWorketFromSrc(vuWorkletName, VolMeterWorket)
-    );
-    this.vuWorklet = new AudioWorkletNode(this.audioContext, vuWorkletName);
-    this.vuWorklet.port.onmessage = (ev: MessageEvent) => {
-      this.emitter.emit('volume', ev.data.volume);
-    };
-
-    this.source.connect(this.vuWorklet);
+        this.source.connect(this.vuWorklet);
+    }
+    
     this.recording = true;
   }
 
   stop() {
-    // It is plausible that stop would be called before start completes,
-    // such as if the Websocket immediately hangs up
     const handleStop = () => {
       this.source?.disconnect();
       this.stream?.getTracks().forEach(track => track.stop());
       this.stream = undefined;
       this.recordingWorklet = undefined;
       this.vuWorklet = undefined;
+      this.videoTrack = undefined;
     };
     if (this.starting) {
       this.starting.then(handleStop);

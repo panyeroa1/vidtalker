@@ -52,6 +52,7 @@ export function useLiveApi({
 
   const audioStreamerRef = useRef<AudioStreamer | null>(null);
   const audioRecorderRef = useRef<AudioRecorder | null>(null);
+  const videoIntervalRef = useRef<number | null>(null);
 
   const [volume, setVolume] = useState(0);
   const [isVolumeEnabled, setIsVolumeEnabled] = useState(true);
@@ -116,6 +117,11 @@ export function useLiveApi({
 
     const onClose = () => {
       setConnected(false);
+      // Clear video loop
+      if (videoIntervalRef.current) {
+        window.clearInterval(videoIntervalRef.current);
+        videoIntervalRef.current = null;
+      }
     };
 
     const stopAudioStreamer = () => {
@@ -226,11 +232,21 @@ export function useLiveApi({
     // Start Screen Capture
     await recorder.startScreenCapture();
 
-    // Hook up listener
+    // Hook up listener for Audio
     const onData = (base64: string) => {
        client.sendRealtimeInput([{ mimeType: 'audio/pcm;rate=16000', data: base64 }]);
     };
     recorder.on('data', onData);
+
+    // Setup Video Loop for Vision (Captions)
+    // Send a frame every 1 second
+    if (videoIntervalRef.current) clearInterval(videoIntervalRef.current);
+    videoIntervalRef.current = window.setInterval(async () => {
+        const frameBase64 = await recorder.captureFrame();
+        if (frameBase64) {
+            client.sendRealtimeInput([{ mimeType: 'image/jpeg', data: frameBase64 }]);
+        }
+    }, 1000);
     
     // Connect to Client
     await client.connect(config);
@@ -238,6 +254,10 @@ export function useLiveApi({
 
   const disconnect = useCallback(async () => {
     client.disconnect();
+    if (videoIntervalRef.current) {
+        window.clearInterval(videoIntervalRef.current);
+        videoIntervalRef.current = null;
+    }
     if (audioRecorderRef.current) {
         audioRecorderRef.current.stop();
         audioRecorderRef.current = null;

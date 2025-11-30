@@ -15,25 +15,27 @@ export type Theme = 'light' | 'dark';
 export type VoiceStyle = 'natural' | 'breathy' | 'dramatic';
 
 const generateSystemPrompt = (language: string, mediaTitle: string = '') => `
-ROLE: Simultaneous Audio Interpreter & Scene Narrator
-TARGET LANGUAGE: [${language || 'English'}]
-INPUT SOURCE: Live Audio Stream (Video/Movie/Speech)
-CONTEXT: ${mediaTitle ? `You are interpreting a video/content titled: "${mediaTitle}"` : 'General Media Stream'}
+ROLE: Simultaneous Interpreter & Vision-Aware Narrator
+TARGET LANGUAGE: [${language || 'Auto-Detect (Match Context)'}]
+INPUT SOURCE: Audio-Visual Stream (Screen Capture + Audio)
+CONTEXT: ${mediaTitle ? `Content Title: "${mediaTitle}"` : 'General Media'}
 
 OBJECTIVE:
-1. **LISTEN** to the incoming audio stream continuously.
-2. **INTERPRET** the spoken dialogue or narration into [${language}] in real-time.
-3. **SCENE AWARENESS**: You must adapt your voice, tone, pace, and energy to match the *scene* of the input audio exactly.
-   - If the scene is **tense/whispered**: Speak softly, urgently, using a breathy tone.
-   - If the scene is **loud/chaotic/action**: Project authority, speak faster, use a "shouting" dynamic if appropriate.
-   - If the scene is **emotional/sad**: Use a trembling, empathetic tone.
-   - If the scene is **formal/speech**: Use a "Charismatic Orator" preaching cadence.
+1. **WATCH & LISTEN**: You are receiving both AUDIO and VIDEO frames.
+   - **VISUAL CUES**: Look for **Subtitles/Captions** on screen. Use them as the ground truth for names, spelling, and dialogue if audio is unclear.
+   - **SCENE ANALYSIS**: Analyze the visual scene (facial expressions, setting) to inform your tone.
 
-INSTRUCTIONS:
-- Do not act as a chatbot. Do not reply to the user.
-- You are the *voice dub* of the content in the target language.
-- Translate meaning-for-meaning, ensuring lip-sync-like pacing where possible.
-- If there is silence in the input, remain silent.
+2. **INTERPRET**:
+   - Translate the spoken content or on-screen captions into [${language || 'the target language'}] immediately.
+   - **Sync**: Try to match the speaking pace of the source.
+
+3. **VOICE ACTING**:
+   - Do not sound robotic. Be a "Voice Actor" dubbing the video.
+   - If the source laughs, you sound amused. If they are serious, you are authoritative.
+
+CRITICAL:
+- If you see captions, prioritize reading/translating them to ensure accuracy.
+- Do not describe the video ("I see a man..."). Just **speak for them**.
 `;
 
 /**
@@ -49,6 +51,7 @@ export const useSettings = create<{
   mediaTitle: string;
   backgroundPadEnabled: boolean;
   backgroundPadVolume: number;
+  sourceVolume: number; // 0-100 for YouTube IFrame
   setSystemPrompt: (prompt: string) => void;
   setModel: (model: string) => void;
   setVoice: (voice: string) => void;
@@ -58,6 +61,7 @@ export const useSettings = create<{
   setMediaTitle: (title: string) => void;
   setBackgroundPadEnabled: (enabled: boolean) => void;
   setBackgroundPadVolume: (volume: number) => void;
+  setSourceVolume: (volume: number) => void;
 }>(set => ({
   language: '',
   mediaTitle: '',
@@ -65,9 +69,10 @@ export const useSettings = create<{
   model: DEFAULT_LIVE_API_MODEL,
   voice: DEFAULT_VOICE,
   voiceStyle: 'breathy',
-  mediaUrl: 'https://www.youtube.com/embed/jfKfPfyJRdk?si=Fv6Xn-Gj8HqQo-fM', // Default ambience
+  mediaUrl: 'https://www.youtube.com/embed/jfKfPfyJRdk?si=Fv6Xn-Gj8HqQo-fM', 
   backgroundPadEnabled: false,
   backgroundPadVolume: 0.2,
+  sourceVolume: 50,
   setSystemPrompt: prompt => set({ systemPrompt: prompt }),
   setModel: model => set({ model }),
   setVoice: voice => set({ voice }),
@@ -83,6 +88,7 @@ export const useSettings = create<{
   })),
   setBackgroundPadEnabled: enabled => set({ backgroundPadEnabled: enabled }),
   setBackgroundPadVolume: volume => set({ backgroundPadVolume: volume }),
+  setSourceVolume: volume => set({ sourceVolume: volume }),
 }));
 
 /**
@@ -94,7 +100,7 @@ export const useUI = create<{
   toggleSidebar: () => void;
   toggleTheme: () => void;
 }>(set => ({
-  isSidebarOpen: false, // Default closed on mobile-first approach
+  isSidebarOpen: false, 
   theme: 'dark',
   toggleSidebar: () => set(state => ({ isSidebarOpen: !state.isSidebarOpen })),
   toggleTheme: () => set(state => ({ theme: state.theme === 'light' ? 'dark' : 'light' })),
@@ -120,10 +126,9 @@ export const useTools = create<{
   removeTool: (toolName: string) => void;
   updateTool: (oldName: string, updatedTool: FunctionCall) => void;
 }>(set => ({
-  tools: [], // Default to no tools for read-aloud mode
+  tools: [], 
   template: 'eburon-tts',
   setTemplate: (template: Template) => {
-    // No-op for now as we only have one mode
   },
   toggleTool: (toolName: string) =>
     set(state => ({

@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -15,7 +16,9 @@ export default function Sidebar() {
     voiceStyle, setVoiceStyle,
     backgroundPadEnabled, setBackgroundPadEnabled,
     backgroundPadVolume, setBackgroundPadVolume,
-    mediaUrl, setMediaUrl
+    mediaUrl, setMediaUrl,
+    systemPrompt, setSystemPrompt,
+    sourceVolume, setSourceVolume
   } = useSettings();
   const { connected } = useLiveAPIContext();
 
@@ -42,6 +45,24 @@ export default function Sidebar() {
                     style={{width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-panel-secondary)', color: 'var(--text-main)'}}
                 />
             </div>
+            
+            <div style={{marginBottom: '1rem'}}>
+                 <label style={{display: 'block', marginBottom: '8px', fontSize: '0.85rem'}}>Source Volume (YouTube)</label>
+                 <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+                     <span style={{fontSize: '0.8rem', minWidth: '30px'}}>{sourceVolume}%</span>
+                     <input 
+                        type="range" 
+                        min="0" 
+                        max="100" 
+                        value={sourceVolume}
+                        onChange={(e) => setSourceVolume(parseInt(e.target.value))}
+                        style={{width: '100%', cursor: 'pointer'}}
+                     />
+                 </div>
+                 <p style={{fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px'}}>
+                    Lower this to separate source audio from interpretation.
+                 </p>
+            </div>
           </div>
 
           <div className="sidebar-section">
@@ -61,12 +82,34 @@ export default function Sidebar() {
                   }}
                 >
                   <option value="" disabled>Select...</option>
+                  <option value="">Auto-Detect (Match Context)</option>
                   {SUPPORTED_LANGUAGES.map(lang => (
                     <option key={lang} value={lang}>
                       {lang}
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div style={{marginBottom: '1rem'}}>
+                <label style={{display: 'block', marginBottom: '8px', fontSize: '0.85rem'}}>Persona Description</label>
+                <textarea 
+                  value={systemPrompt}
+                  onChange={(e) => setSystemPrompt(e.target.value)}
+                  rows={12}
+                  style={{
+                    width: '100%', 
+                    padding: '0.75rem', 
+                    borderRadius: '8px', 
+                    border: '1px solid var(--border-color)', 
+                    background: 'var(--bg-panel-secondary)', 
+                    color: 'var(--text-main)',
+                    fontFamily: 'monospace',
+                    fontSize: '0.8rem',
+                    resize: 'vertical',
+                    lineHeight: '1.4'
+                  }}
+                />
               </div>
 
               <div style={{marginBottom: '1rem'}}>
